@@ -1,6 +1,10 @@
+import consumer.Consumer
 
 object Main {
   def main(args: Array[String]): Unit = {
-    println("Hello world!")
+    Consumer.startConsuming()
+
+    // Keep the main thread alive indefinitely
+    Thread.currentThread().join()
   }
 }
