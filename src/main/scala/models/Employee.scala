@@ -4,7 +4,6 @@ import io.circe.Decoder
 import slick.jdbc.PostgresProfile.api._
 import slick.lifted.ProvenShape
 import io.circe.generic.semiauto.deriveDecoder
-import io.circe.syntax._
 
 case class Employee(id: Option[Int], name: String, email: String)
 
@@ -19,7 +18,5 @@ class Employees(tag: Tag) extends Table[Employee](tag, "employees") {
 
 object Employee {
   val table = TableQuery[Employees]
-
-  // Explicit decoder for the 'id' field to handle Option[Int]
   implicit val employeeDecoder: Decoder[Employee] = deriveDecoder[Employee]
 }
