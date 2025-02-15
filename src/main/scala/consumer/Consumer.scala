@@ -1,13 +1,16 @@
 package consumer
 
-import com.rabbitmq.client.{AMQP, Channel, Connection, DefaultConsumer, DeliverCallback, Envelope}
+import com.rabbitmq.client.{Connection, DeliverCallback}
 import com.typesafe.config.ConfigFactory
 import config.RabbitMQConfig
+import io.circe.jawn.decode
+import models.Employee
+import scala.concurrent.ExecutionContext.Implicits.global
 
-import scala.util.{Failure, Success, Try, Using}
-import io.circe.parser.decode
+import scala.util.{Failure, Success, Try}
+import services.EmployeeService
 
-object Consumer  {
+class Consumer(employeeService: EmployeeService)  {
   private val config = ConfigFactory.load()
   private val rabbitmqConfig = config.getConfig("rabbitmq")
 
@@ -23,6 +26,14 @@ object Consumer  {
             Try(new String(delivery.getBody, "UTF-8")) match {
               case Success(request) =>
                 println(request)
+                decode [Employee](request) match{
+                  case Right(employee) =>
+                    employeeService.addEmployee(employee).onComplete {
+                      case Success(id) => println(s"Employee saved with ID: $id")
+                      case Failure(exception) => println(s"Failed to save employee: ${exception.getMessage}")
+                    }
+                  case Left(error) => println(s"Bad Request: $error")
+                }
               case Failure(exception) =>
                 println(s"Failed to convert delivery body: ${exception.getMessage}")
             }
