@@ -8,4 +8,17 @@ class EmployeeService(employeeRepository: EmployeeRepository)(implicit ec: Execu
   def addEmployee(employee: Employee): Future[Int] = {
     employeeRepository.create(employee)
   }
+
+  def getEmployeeById(id: Int) = {
+    employeeRepository.getById(id)
+  }
+
+  def updateEmployee(employee: Employee) : Future[Int] = {
+    employeeRepository.update(employee)
+  }
+
+  def deleteEmployeeById(id: Int): Future[Int] = {
+    employeeRepository.delete(id)
+  }
+
 }

@@ -5,14 +5,17 @@ import com.typesafe.config.ConfigFactory
 import config.RabbitMQConfig
 import io.circe.jawn.decode
 import models.Employee
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
 import services.EmployeeService
+import io.circe.generic.auto._
+import io.circe.syntax.EncoderOps
 
 class Consumer(employeeService: EmployeeService) {
   private val config = ConfigFactory.load()
   private val rabbitmqConfig = config.getConfig("rabbitmq")
-  private val CONSUME_QUEUE_NAME = rabbitmqConfig.getString("consumeQueueName")
+  private val QUEUE_NAME = rabbitmqConfig.getString("queueName")
 
   private var channel: Option[Channel] = None
   private var connection: Option[Connection] = None
@@ -24,32 +27,100 @@ class Consumer(employeeService: EmployeeService) {
         Try(conn.createChannel()) match {
           case Success(ch: Channel) =>
             channel = Some(ch)
-            try {
-              ch.queueDeclare(CONSUME_QUEUE_NAME, false, false, false, null)
 
-              val deliverCallback: DeliverCallback = (_, delivery) => {
-                Try(new String(delivery.getBody, "UTF-8")) match {
-                  case Success(request) =>
-                    println(s"Received data: $request")
-                    decode[Employee](request) match {
-                      case Right(employee) =>
-                        employeeService.addEmployee(employee).onComplete {
-                          case Success(id) => println(s"Employee saved with ID: $id")
-                          case Failure(exception) => println(s"Failed to save employee: ${exception.getMessage}")
-                        }
-                      case Left(error) => println(s"Bad Request: $error")
+              Try(ch.queueDeclare(QUEUE_NAME, false, false, false, null)) match{
+                case Success(_)=>
+                  val deliverCallback: DeliverCallback = (_, delivery) => {
+                    val bodyStr = new String(delivery.getBody, "UTF-8")
+                    val props   = delivery.getProperties
+                    val replyTo = props.getReplyTo
+                    val correlationId = props.getCorrelationId
+
+                    println(s"Received RPC request: $bodyStr")
+
+                    def sendResponse(response: String): Unit = {
+                      val replyProps = new com.rabbitmq.client.AMQP.BasicProperties.Builder()
+                        .correlationId(correlationId)
+                        .build()
+                      if (replyTo != null && replyTo.nonEmpty)
+                        ch.basicPublish("", replyTo, replyProps, response.getBytes("UTF-8"))
+                      ch.basicAck(delivery.getEnvelope.getDeliveryTag, false)
                     }
-                  case Failure(exception) =>
-                    println(s"Failed to convert delivery body: ${exception.getMessage}")
-                }
-              }
 
-              ch.basicConsume(QUEUE_NAME, true, deliverCallback, (_: String) => ())
-            } catch {
-              case ex: Exception =>
-                println(s"Channel error: ${ex.getMessage}")
-                cleanup()
-            }
+                    val parts = bodyStr.split(":", 2)
+                    if (parts.length != 2) {
+                      println("Bad request")
+                      sendResponse("""{"status": "error", "message": "Bad request"}""")
+                    } else {
+                      val operation = parts(0)
+                      val payload   = parts(1)
+                      operation match {
+                        case "create" =>
+                          decode[Employee](payload) match {
+                            case Right(employee) =>
+                              employeeService.addEmployee(employee).onComplete {
+                                case Success(id) =>
+                                  sendResponse(s"""{"status": "success", "id": $id}""")
+                                case Failure(ex) =>
+                                  sendResponse(s"""{"status": "error", "message": "${ex.getMessage}"}""")
+                              }
+                            case Left(error) =>
+                              sendResponse(s"""{"status": "error", "message": "Invalid employee data: $error"}""")
+                          }
+                        case "get" =>
+                          Try(payload.toInt) match {
+                            case Success(id) =>
+                              employeeService.getEmployeeById(id).onComplete {
+                                case Success(Some(employee)) =>
+                                  sendResponse(s"""{"status": "success", "employee": ${employee.asJson.noSpaces}}""")
+                                case Success(None) =>
+                                  sendResponse(s"""{"status": "error", "message": "Employee not found"}""")
+                                case Failure(ex) =>
+                                  sendResponse(s"""{"status": "error", "message": "${ex.getMessage}"}""")
+                              }
+                            case Failure(ex) =>
+                              sendResponse(s"""{"status": "error", "message": "Invalid id: ${ex.getMessage}"}""")
+                          }
+                        case "update" =>
+                          decode[Employee](payload) match {
+                            case Right(employee) =>
+                              employeeService.updateEmployee(employee).onComplete {
+                                case Success(count) =>
+                                  if (count > 0)
+                                    sendResponse(s"""{"status": "success", "updated": $count}""")
+                                  else
+                                    sendResponse(s"""{"status": "error", "message": "Employee not updated"}""")
+                                case Failure(ex) =>
+                                  sendResponse(s"""{"status": "error", "message": "${ex.getMessage}"}""")
+                              }
+                            case Left(error) =>
+                              sendResponse(s"""{"status": "error", "message": "Invalid employee data: $error"}""")
+                          }
+                        case "delete" =>
+                          Try(payload.toInt) match {
+                            case Success(id) =>
+                              employeeService.deleteEmployeeById(id).onComplete {
+                                case Success(count) =>
+                                  if (count > 0)
+                                    sendResponse(s"""{"status": "success", "deleted": $count}""")
+                                  else
+                                    sendResponse(s"""{"status": "error", "message": "Employee not found"}""")
+                                case Failure(ex) =>
+                                  sendResponse(s"""{"status": "error", "message": "${ex.getMessage}"}""")
+                              }
+                            case Failure(ex) =>
+                              sendResponse(s"""{"status": "error", "message": "Invalid id: ${ex.getMessage}"}""")
+                          }
+                        case _ =>
+                          sendResponse(s"""{"status": "error", "message": "Unknown operation"}""")
+                      }
+                    }
+                  }
+
+                  ch.basicConsume(QUEUE_NAME, false, deliverCallback, (_: String) => ())
+
+                  }
+
           case Failure(ex) =>
             println(s"Failed to create channel: ${ex.getMessage}")
             cleanup()

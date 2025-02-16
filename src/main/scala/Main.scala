@@ -17,7 +17,7 @@ object Main {
         Await.result(employeeRepository.createTableIfNotExists(), 30.seconds)
 
         val employeeService = new EmployeeService(employeeRepository)
-        val consumer = new Consumer(employeeService)
+        val consumer        = new Consumer(employeeService)
 
         consumer.startConsuming()
 
@@ -27,6 +27,7 @@ object Main {
           Try(db.close()).failed.foreach(e => println(s"Database close error: ${e.getMessage}"))
         }
 
+        // Keep the main thread alive
         Thread.currentThread().join()
       }.recoverWith {
         case ex =>
@@ -35,7 +36,8 @@ object Main {
           Failure(ex)
       }
     } match {
-      case Success(_) => println("Application started successfully.")
+      case Success(_) =>
+        println("Application started successfully.")
       case Failure(ex) =>
         println(s"Failed to initialize application: ${ex.getMessage}")
         System.exit(1)
