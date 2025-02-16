@@ -20,7 +20,7 @@ services:
       - RABBITMQ_PASSWORD=guest
     restart: unless-stopped
     networks:
-      - app-network
+      - shared-network
 
   postgres:
     image: postgres:14-alpine
@@ -39,7 +39,7 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
-      - app-network
+      - shared-network
 
   rabbitmq:
     image: rabbitmq:3.12-management-alpine
@@ -56,11 +56,11 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
-      - app-network
+      - shared-network
 
 networks:
-  app-network:
-    driver: bridge
+  shared-network:
+    external: true
 
 volumes:
   postgres_data:
