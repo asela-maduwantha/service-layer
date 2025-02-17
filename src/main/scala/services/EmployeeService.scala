@@ -9,7 +9,7 @@ class EmployeeService(employeeRepository: EmployeeRepository)(implicit ec: Execu
     employeeRepository.create(employee)
   }
 
-  def getEmployeeById(id: Int) = {
+  def getEmployeeById(id: Int): Future[Option[Employee]] = {
     employeeRepository.getById(id)
   }
 
