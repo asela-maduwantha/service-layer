@@ -23,7 +23,6 @@ object Main {
 
         sys.addShutdownHook {
           println("Shutting down application...")
-          Try(consumer.shutdown()).failed.foreach(e => println(s"Consumer shutdown error: ${e.getMessage}"))
           Try(db.close()).failed.foreach(e => println(s"Database close error: ${e.getMessage}"))
         }
 

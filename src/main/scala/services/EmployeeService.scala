@@ -2,9 +2,10 @@ package services
 
 import models.Employee
 import repositories.EmployeeRepository
-import scala.concurrent.{Future, ExecutionContext}
 
-class EmployeeService(employeeRepository: EmployeeRepository)(implicit ec: ExecutionContext) {
+import scala.concurrent.Future
+
+class EmployeeService(employeeRepository: EmployeeRepository) {
   def addEmployee(employee: Employee): Future[Int] = {
     employeeRepository.create(employee)
   }

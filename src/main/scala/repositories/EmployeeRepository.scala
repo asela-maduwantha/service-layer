@@ -4,7 +4,6 @@ import slick.jdbc.PostgresProfile.api._
 import models.Employee
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
 
 class EmployeeRepository(db: Database)(implicit ec: ExecutionContext) {
   def createTableIfNotExists(): Future[Unit] = {
@@ -29,9 +28,8 @@ class EmployeeRepository(db: Database)(implicit ec: ExecutionContext) {
   //update an employee
   def update(employee: Employee): Future[Int] = {
     employee.id match{
-      case Some(id) =>{
+      case Some(id) =>
         db.run(Employee.table.filter(_.id === id).update(employee))
-      }
 
       case None =>
         Future.failed(new SlickException("Employee not found"))
