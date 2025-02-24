@@ -16,7 +16,10 @@ libraryDependencies ++= Seq(
   "io.circe"          %% "circe-generic"       % "0.14.5",
   "io.circe"          %% "circe-parser"        % "0.14.5",
   "com.typesafe"       %  "config"             % "1.4.2",
-  "com.zaxxer"         %  "HikariCP"           % "5.0.1"
+  "com.zaxxer"         %  "HikariCP"           % "5.0.1",
+  "org.scalatest" %% "scalatest" % "3.2.19" % Test,
+  "org.scalatestplus" %% "mockito-4-11" % "3.2.17.0" % Test,
+
 )
 
 import sbtassembly.AssemblyPlugin.autoImport._
